@@ -17,7 +17,6 @@ public class RetrofitClient {
 
     public static Retrofit getRetrofitInstance(String base_url) {
         if (!(retrofitInstance != null && (BASE_URL.equals(base_url) || base_url.isEmpty()))) {
-
             RetrofitClient.BASE_URL = base_url;
             OkHttpClient.Builder httpClient = new OkHttpClient.Builder();
             HttpLoggingInterceptor logging = new HttpLoggingInterceptor();

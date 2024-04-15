@@ -16,6 +16,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
+import android.content.SharedPreferences;
 
 import android.provider.Settings;
 import android.view.View;
@@ -70,6 +71,7 @@ public class CameraActivity extends AppCompatActivity {
     private Button captureButton;
     private Retrofit retrofit;
     private String androidId;
+    private SharedPreferences sharedPreferences;
 
     public interface UploadService {
         @Multipart
@@ -99,7 +101,8 @@ public class CameraActivity extends AppCompatActivity {
         statusTextView = findViewById(R.id.status_counter);
         statusTextView.setVisibility(View.GONE);
 
-        retrofit = RetrofitClient.getRetrofitInstance();
+        sharedPreferences = getSharedPreferences(getString(R.string.shared_name), MODE_PRIVATE);
+        retrofit = RetrofitClient.getRetrofitInstance(sharedPreferences.getString("server_url", ""));
         androidId = Settings.Secure.getString(getContentResolver(), Settings.Secure.ANDROID_ID);
 
         successCounter = findViewById(R.id.success_counter);
@@ -132,11 +135,11 @@ public class CameraActivity extends AppCompatActivity {
     @Override
     public void onResume() {
         super.onResume();
+        retrofit = RetrofitClient.getRetrofitInstance(sharedPreferences.getString("server_url", ""));
         getCounter();
     }
 
     private void logout(View view){
-        SharedPreferences sharedPreferences = getSharedPreferences(getString(R.string.shared_name), MODE_PRIVATE);
         SharedPreferences.Editor editor = sharedPreferences.edit();
         editor.putBoolean("LoginSuccess", false);
         editor.apply();
