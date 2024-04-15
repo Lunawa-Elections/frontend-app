@@ -61,6 +61,8 @@ public class MainActivity extends AppCompatActivity {
         sharedPreferences = getSharedPreferences(getString(R.string.shared_name), MODE_PRIVATE);
         saveSharedPref("server_url", sharedPreferences.getString("server_url", getString(R.string.server_url)));
 
+        retrofit = RetrofitClient.getRetrofitInstance(sharedPreferences.getString("server_url", ""));
+
         loginButton.setOnClickListener(v -> {
             String enteredPassword = passwordEditText.getText().toString();
             authenticatePassword(enteredPassword);
@@ -74,8 +76,6 @@ public class MainActivity extends AppCompatActivity {
                 return true;
             }
         });
-
-        retrofit = RetrofitClient.getRetrofitInstance(sharedPreferences.getString("server_url", ""));
 
         if (sharedPreferences.getBoolean("LoginSuccess", false)) {
             updateStatus("Success", Color.GREEN);
@@ -161,6 +161,7 @@ public class MainActivity extends AppCompatActivity {
                     public void onClick(DialogInterface dialog, int which) {
                         String newUrl = yesEt.getText().toString();
                         saveSharedPref("server_url", newUrl);
+                        retrofit = RetrofitClient.getRetrofitInstance(sharedPreferences.getString("server_url", ""));
                         dialog.dismiss();
                     }
                 })
