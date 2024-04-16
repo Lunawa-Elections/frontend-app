@@ -169,6 +169,7 @@ public class MainActivity extends AppCompatActivity {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
                         saveSharedPref("server_url", getString(R.string.server_url));
+                        retrofit = RetrofitClient.getRetrofitInstance(sharedPreferences.getString("server_url", ""));
                         dialog.dismiss();
                     }
                 })
