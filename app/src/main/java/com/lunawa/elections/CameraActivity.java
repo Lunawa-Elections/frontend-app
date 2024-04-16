@@ -9,6 +9,10 @@ import android.icu.text.SimpleDateFormat;
 import android.net.Uri;
 import android.os.Bundle;
 
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+
 import android.content.Intent;
 import android.content.pm.PackageManager;
 
@@ -18,6 +22,8 @@ import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
 import android.content.SharedPreferences;
 
+import android.os.Handler;
+import android.os.Looper;
 import android.provider.Settings;
 import android.view.View;
 import android.widget.TextView;
@@ -72,6 +78,8 @@ public class CameraActivity extends AppCompatActivity {
     private Retrofit retrofit;
     private String androidId;
     private SharedPreferences sharedPreferences;
+    private String img_name;
+    private ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
     public interface UploadService {
         @Multipart
@@ -82,6 +90,11 @@ public class CameraActivity extends AppCompatActivity {
     public interface CounterService {
         @GET("counter/{android_id}")
         Call<ResponseBody> getCounter(@Path("android_id") String androidId);
+    }
+
+    public interface ImageService {
+        @GET("get_image/{img_name}")
+        Call<ResponseBody> getImage(@Path("img_name") String img_name);
     }
 
     public interface ResetService {
@@ -177,6 +190,38 @@ public class CameraActivity extends AppCompatActivity {
         });
     }
 
+    private boolean retryAttempted = false;
+    private void getImage() {
+        ImageService service = retrofit.create(ImageService.class);
+        Call<ResponseBody> call = service.getImage(img_name);
+        call.enqueue(new Callback<ResponseBody>() {
+            @Override
+            public void onResponse(Call<ResponseBody> call, Response<ResponseBody> response) {
+                if (response.isSuccessful() && response.body() != null) {
+                    Bitmap bitmap = BitmapFactory.decodeStream(response.body().byteStream());
+                    runOnUiThread(() -> imageView.setImageBitmap(bitmap));
+                    updateStatus("Success", Color.GREEN);
+                    Toast.makeText(CameraActivity.this, "Image Uploaded successfully", Toast.LENGTH_SHORT).show();
+                } else {
+                    updateStatus("Fetching", Color.RED);
+                    if (!retryAttempted) {
+                        retryAttempted = true;
+                        scheduler.schedule(CameraActivity.this::getImage, 3, TimeUnit.SECONDS);
+                    }
+                }
+                photoURI = null;
+                getCounter();
+                captureButton.setVisibility(View.VISIBLE);
+            }
+
+            @Override
+            public void onFailure(Call<ResponseBody> call, Throwable t) {
+                updateStatus("Server Error", Color.RED);
+                captureButton.setVisibility(View.VISIBLE);
+            }
+        });
+    }
+
     private void getCounter() {
         CounterService service = retrofit.create(CounterService.class);
         Call<ResponseBody> call = service.getCounter(androidId);
@@ -199,6 +244,7 @@ public class CameraActivity extends AppCompatActivity {
             @Override
             public void onFailure(Call<ResponseBody> call, Throwable t) {
                 updateStatus("Server Error", Color.RED);
+                captureButton.setVisibility(View.VISIBLE);
             }
         });
     }
@@ -225,6 +271,7 @@ public class CameraActivity extends AppCompatActivity {
     private Uri createImageFile() {
         String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(new Date());
         String imageFileName = "ballot_" + androidId + "_" + timeStamp + ".jpg";
+        img_name = imageFileName;
 
         ContentValues values = new ContentValues();
         values.put(MediaStore.Images.Media.DISPLAY_NAME, imageFileName);
@@ -301,18 +348,15 @@ public class CameraActivity extends AppCompatActivity {
         call.enqueue(new Callback<ResponseBody>() {
             @Override
             public void onResponse(Call<ResponseBody> call, Response<ResponseBody> response) {
-                if (response.isSuccessful() && response.body() != null) {
-                    Bitmap bitmap = BitmapFactory.decodeStream(response.body().byteStream());
-                    runOnUiThread(() -> imageView.setImageBitmap(bitmap));
-                    updateStatus("Success", Color.GREEN);
-                    Toast.makeText(CameraActivity.this, "Image Uploaded successfully", Toast.LENGTH_SHORT).show();
+                if (response.isSuccessful()) {
+                    Toast.makeText(CameraActivity.this, "Image Uploaded", Toast.LENGTH_SHORT).show();
+                    updateStatus("Processing", Color.GREEN);
+                    getImage();
                 } else {
                     updateStatus("Invalid Image", Color.RED);
                     Toast.makeText(CameraActivity.this, "Need image of ballot", Toast.LENGTH_SHORT).show();
+                    captureButton.setVisibility(View.VISIBLE);
                 }
-                photoURI = null;
-                getCounter();
-                captureButton.setVisibility(View.VISIBLE);
             }
 
             @Override
@@ -328,13 +372,15 @@ public class CameraActivity extends AppCompatActivity {
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
 
-        if (requestCode == REQUEST_IMAGE_CAPTURE && resultCode == RESULT_OK) {
-            imageView.setImageURI(photoURI);
-            statusTextView.setVisibility(View.GONE);
-            uploadImage(photoURI);
-        }
-        else if (requestCode == REQUEST_IMAGE_CAPTURE){
-            captureButton.setVisibility(View.VISIBLE);
+        if (requestCode == REQUEST_IMAGE_CAPTURE) {
+            if (resultCode == RESULT_OK) {
+                imageView.setImageURI(photoURI);
+                statusTextView.setVisibility(View.GONE);
+                uploadImage(photoURI);
+            }
+            else {
+                captureButton.setVisibility(View.VISIBLE);
+            }
         }
     }
 }
